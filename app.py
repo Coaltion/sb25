@@ -29,7 +29,6 @@ def save_data(df):
         return False
 
 def load_config():
-    """加载配置（管理员密码）"""
     try:
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -50,7 +49,6 @@ def save_config(config):
 if "data" not in st.session_state:
     st.session_state.data = load_data()
 
-# 从配置文件加载管理员密码
 config = load_config()
 if "admin_password" not in st.session_state:
     st.session_state.admin_password = config.get("admin_password", "admin123")
@@ -62,7 +60,6 @@ if "logged_in_player" not in st.session_state:
 def admin_mode():
     st.subheader("🔐 管理员控制台")
     
-    # ===== 修改密码 =====
     with st.expander("🔑 修改管理员密码"):
         with st.form("change_admin_pwd"):
             col1, col2, col3 = st.columns(3)
@@ -81,14 +78,12 @@ def admin_mode():
                     st.error("❌ 两次输入不一致")
                 else:
                     st.session_state.admin_password = new_pwd
-                    # 保存到配置文件
                     save_config({"admin_password": new_pwd})
                     st.success("✅ 管理员密码修改成功！")
                     st.rerun()
     
     st.divider()
     
-    # ===== 添加新参赛者 =====
     st.subheader("➕ 添加新参赛者")
     with st.form("add_player"):
         col1, col2, col3 = st.columns(3)
@@ -142,23 +137,40 @@ def admin_mode():
             display_records = sorted_records.head(6)
             
             for _, row in display_records.iterrows():
-                with st.container(border=True):
-                    st.markdown(f"**{row['Mode']}**")
-                    result_text = row['Result']
-                    if "VICTORY" in result_text.upper() or "WIN" in result_text.upper():
-                        st.markdown(f"🏆 **结果：{result_text}**")
-                    elif "DEFEAT" in result_text.upper() or "LOSE" in result_text.upper():
-                        st.markdown(f"💔 **结果：{result_text}**")
-                    elif "CLEAR" in result_text.upper():
-                        st.markdown(f"⭐ **结果：{result_text}**")
-                    else:
-                        st.markdown(f"**结果：{result_text}**")
-                    if row['Detail']:
-                        st.caption(f"详情：{row['Detail']}")
-                    if row['XP']:
-                        st.caption(f"积分变化：{row['XP']}")
-                    if row['Date']:
-                        st.caption(f"📅 日期：{row['Date']}")
+                # 游戏风格卡片
+                result_text = row['Result']
+                if "VICTORY" in result_text.upper() or "WIN" in result_text.upper():
+                    result_display = f"🟢 {result_text}"
+                elif "DEFEAT" in result_text.upper() or "LOSE" in result_text.upper():
+                    result_display = f"🔴 {result_text}"
+                elif "CLEAR" in result_text.upper():
+                    result_display = f"🟡 {result_text}"
+                else:
+                    result_display = f"⚪ {result_text}"
+                
+                xp_display = f"⬆ {row['XP']}" if row['XP'] and '↑' in str(row['XP']) else f"⬇ {row['XP']}" if row['XP'] and '↓' in str(row['XP']) else row['XP']
+                
+                st.markdown(f"""
+                <div style="
+                    background: #1e2a36;
+                    border-radius: 12px;
+                    padding: 14px 18px;
+                    margin-bottom: 10px;
+                    border-left: 4px solid #fbbf24;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <div>
+                            <span style="color: #e8edf2; font-size: 1.0rem; font-weight: 500;">{row['Mode']}</span>
+                            {f'<div style="color: #6b7f8f; font-size: 0.8rem; margin-top: 2px;">{row["Detail"]}</div>' if row['Detail'] else ''}
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 1.0rem; font-weight: 500;">{result_display}</div>
+                            {f'<div style="color: #c8d0d8; font-size: 0.9rem;">{xp_display}</div>' if row['XP'] else ''}
+                            {f'<div style="color: #4a5a6a; font-size: 0.7rem;">📅 {row["Date"]}</div>' if row['Date'] else ''}
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
             
             if len(valid_records) > 6:
                 st.warning(f"⚠️ 该参赛者有 {len(valid_records)} 条记录，仅显示最新6条")
@@ -258,23 +270,39 @@ def player_mode():
         else:
             sorted_records = valid_records.sort_values("Date", ascending=False)
             for _, row in sorted_records.iterrows():
-                with st.container(border=True):
-                    st.markdown(f"**{row['Mode']}**")
-                    result_text = row['Result']
-                    if "VICTORY" in result_text.upper() or "WIN" in result_text.upper():
-                        st.markdown(f"🏆 **结果：{result_text}**")
-                    elif "DEFEAT" in result_text.upper() or "LOSE" in result_text.upper():
-                        st.markdown(f"💔 **结果：{result_text}**")
-                    elif "CLEAR" in result_text.upper():
-                        st.markdown(f"⭐ **结果：{result_text}**")
-                    else:
-                        st.markdown(f"**结果：{result_text}**")
-                    if row['Detail']:
-                        st.caption(f"详情：{row['Detail']}")
-                    if row['XP']:
-                        st.caption(f"积分变化：{row['XP']}")
-                    if row['Date']:
-                        st.caption(f"📅 日期：{row['Date']}")
+                result_text = row['Result']
+                if "VICTORY" in result_text.upper() or "WIN" in result_text.upper():
+                    result_display = f"🟢 {result_text}"
+                elif "DEFEAT" in result_text.upper() or "LOSE" in result_text.upper():
+                    result_display = f"🔴 {result_text}"
+                elif "CLEAR" in result_text.upper():
+                    result_display = f"🟡 {result_text}"
+                else:
+                    result_display = f"⚪ {result_text}"
+                
+                xp_display = f"⬆ {row['XP']}" if row['XP'] and '↑' in str(row['XP']) else f"⬇ {row['XP']}" if row['XP'] and '↓' in str(row['XP']) else row['XP']
+                
+                st.markdown(f"""
+                <div style="
+                    background: #1e2a36;
+                    border-radius: 12px;
+                    padding: 14px 18px;
+                    margin-bottom: 10px;
+                    border-left: 4px solid #3b82f6;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <div>
+                            <span style="color: #e8edf2; font-size: 1.0rem; font-weight: 500;">{row['Mode']}</span>
+                            {f'<div style="color: #6b7f8f; font-size: 0.8rem; margin-top: 2px;">{row["Detail"]}</div>' if row['Detail'] else ''}
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 1.0rem; font-weight: 500;">{result_display}</div>
+                            {f'<div style="color: #c8d0d8; font-size: 0.9rem;">{xp_display}</div>' if row['XP'] else ''}
+                            {f'<div style="color: #4a5a6a; font-size: 0.7rem;">📅 {row["Date"]}</div>' if row['Date'] else ''}
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
         return
     
     with st.form("login_form"):
