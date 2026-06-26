@@ -1,13 +1,39 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import json
+import os
 
 st.set_page_config(page_title="🏆 比赛记录查询", page_icon="🏆", layout="centered")
 
+# ========== 数据持久化：从本地文件读取/保存 ==========
+DATA_FILE = "contest_data.json"
+
+def load_data():
+    """从本地文件读取数据"""
+    try:
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return pd.DataFrame(data)
+    except:
+        pass
+    return pd.DataFrame(columns=["ID", "Password", "Name", "Mode", "Result", "Detail", "XP", "Date"])
+
+def save_data(df):
+    """保存数据到本地文件"""
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(df.to_dict(orient="records"), f, ensure_ascii=False, indent=2)
+        return True
+    except:
+        return False
+
 # 初始化数据
 if "data" not in st.session_state:
-    st.session_state.data = pd.DataFrame(columns=["ID", "Password", "Name", "Mode", "Result", "Detail", "XP", "Date"])
+    st.session_state.data = load_data()
 
+# 管理员密码
 if "admin_password" not in st.session_state:
     st.session_state.admin_password = "admin123"
 
@@ -18,7 +44,7 @@ if "logged_in_player" not in st.session_state:
 def admin_mode():
     st.subheader("🔐 管理员控制台")
     
-    # ===== 修改管理员密码 =====
+    # ===== 修改密码 =====
     with st.expander("🔑 修改管理员密码"):
         with st.form("change_admin_pwd"):
             col1, col2, col3 = st.columns(3)
@@ -42,7 +68,7 @@ def admin_mode():
     
     st.divider()
     
-    # ===== 添加新参赛者（独立入口） =====
+    # ===== 添加新参赛者 =====
     st.subheader("➕ 添加新参赛者")
     with st.form("add_player"):
         col1, col2, col3 = st.columns(3)
@@ -69,17 +95,16 @@ def admin_mode():
                     "Date": ""
                 }])
                 st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
+                save_data(st.session_state.data)
                 st.success(f"✅ 参赛者 {new_name}（编号 {new_id}）已添加！")
                 st.rerun()
     
     st.divider()
     
-    # ===== 检查是否有参赛者 =====
     if st.session_state.data.empty:
         st.info("📌 还没有参赛者，请在上方添加")
         return
     
-    # ===== 选择参赛者 =====
     players = st.session_state.data.drop_duplicates(subset=["ID", "Name"])
     player_options = {f"{row['ID']} - {row['Name']}": row['ID'] for _, row in players.iterrows()}
     selected_label = st.selectbox("选择参赛者", list(player_options.keys()))
@@ -88,7 +113,6 @@ def admin_mode():
     player_data = st.session_state.data[st.session_state.data["ID"] == selected_id]
     player_name = player_data.iloc[0]["Name"] if not player_data.empty else ""
     
-    # ===== 显示记录 =====
     st.subheader(f"📊 {player_name} 的比赛记录")
     
     if not player_data.empty:
@@ -100,8 +124,6 @@ def admin_mode():
             for _, row in display_records.iterrows():
                 with st.container(border=True):
                     st.markdown(f"**{row['Mode']}**")
-                    
-                    # 结果显示
                     result_text = row['Result']
                     if "VICTORY" in result_text.upper() or "WIN" in result_text.upper():
                         st.markdown(f"🏆 **结果：{result_text}**")
@@ -111,7 +133,6 @@ def admin_mode():
                         st.markdown(f"⭐ **结果：{result_text}**")
                     else:
                         st.markdown(f"**结果：{result_text}**")
-                    
                     if row['Detail']:
                         st.caption(f"详情：{row['Detail']}")
                     if row['XP']:
@@ -124,7 +145,6 @@ def admin_mode():
         else:
             st.info("暂无比赛记录")
     
-    # ===== 添加比赛记录 =====
     st.divider()
     st.subheader(f"➕ 为 {player_name} 添加比赛记录")
     with st.form("add_record"):
@@ -156,14 +176,15 @@ def admin_mode():
                     "Date": new_date.strftime("%Y/%m/%d")
                 }])
                 st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
+                save_data(st.session_state.data)
                 st.success("✅ 记录添加成功！")
                 st.rerun()
     
-    # ===== 删除 =====
     st.divider()
     with st.expander("🗑️ 删除选项"):
         if st.button(f"删除参赛者 {selected_label}"):
             st.session_state.data = st.session_state.data[st.session_state.data["ID"] != selected_id]
+            save_data(st.session_state.data)
             st.success(f"已删除 {selected_label}")
             st.rerun()
 
@@ -185,7 +206,6 @@ def player_mode():
             st.session_state.logged_in_player = None
             st.rerun()
         
-        # 修改密码
         with st.expander("🔑 修改密码"):
             with st.form("change_player_pwd"):
                 col1, col2, col3 = st.columns(3)
@@ -206,10 +226,10 @@ def player_mode():
                     else:
                         idx = player_data.index[0]
                         st.session_state.data.at[idx, "Password"] = new_pwd
+                        save_data(st.session_state.data)
                         st.success("✅ 密码修改成功！")
                         st.rerun()
         
-        # 显示记录
         st.subheader(f"📊 {name} 的比赛记录")
         valid_records = player_data[player_data["Mode"] != ""]
         
@@ -237,7 +257,6 @@ def player_mode():
                         st.caption(f"📅 日期：{row['Date']}")
         return
     
-    # 登录表单
     with st.form("login_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -264,7 +283,6 @@ def player_mode():
                 st.rerun()
 
 
-# ========== 主界面 ==========
 st.title("🏆 比赛记录系统")
 
 mode = st.radio("选择模式", ["参赛者查询", "管理员录入"], horizontal=True)
@@ -279,4 +297,4 @@ else:
     player_mode()
 
 st.divider()
-st.caption("📌 数据仅保存在当前会话中，刷新页面会重置。")
+st.caption("💾 数据已自动保存到本地，刷新页面不会丢失")
