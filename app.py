@@ -6,11 +6,11 @@ import os
 
 st.set_page_config(page_title="🏆 比赛记录查询", page_icon="🏆", layout="centered")
 
-# ========== 数据持久化：从本地文件读取/保存 ==========
+# ========== 数据文件 ==========
 DATA_FILE = "contest_data.json"
+CONFIG_FILE = "config.json"
 
 def load_data():
-    """从本地文件读取数据"""
     try:
         if os.path.exists(DATA_FILE):
             with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -21,7 +21,6 @@ def load_data():
     return pd.DataFrame(columns=["ID", "Password", "Name", "Mode", "Result", "Detail", "XP", "Date"])
 
 def save_data(df):
-    """保存数据到本地文件"""
     try:
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(df.to_dict(orient="records"), f, ensure_ascii=False, indent=2)
@@ -29,13 +28,32 @@ def save_data(df):
     except:
         return False
 
-# 初始化数据
+def load_config():
+    """加载配置（管理员密码）"""
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except:
+        pass
+    return {"admin_password": "admin123"}
+
+def save_config(config):
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        return True
+    except:
+        return False
+
+# ========== 初始化 ==========
 if "data" not in st.session_state:
     st.session_state.data = load_data()
 
-# 管理员密码
+# 从配置文件加载管理员密码
+config = load_config()
 if "admin_password" not in st.session_state:
-    st.session_state.admin_password = "admin123"
+    st.session_state.admin_password = config.get("admin_password", "admin123")
 
 if "logged_in_player" not in st.session_state:
     st.session_state.logged_in_player = None
@@ -63,6 +81,8 @@ def admin_mode():
                     st.error("❌ 两次输入不一致")
                 else:
                     st.session_state.admin_password = new_pwd
+                    # 保存到配置文件
+                    save_config({"admin_password": new_pwd})
                     st.success("✅ 管理员密码修改成功！")
                     st.rerun()
     
@@ -297,4 +317,4 @@ else:
     player_mode()
 
 st.divider()
-st.caption("💾 数据已自动保存到本地，刷新页面不会丢失")
+st.caption("💾 数据已自动保存，刷新页面不会丢失")
